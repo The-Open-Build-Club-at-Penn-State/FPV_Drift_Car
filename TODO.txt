@@ -1,0 +1,12 @@
+TODO:
+
+* Specifications
+  - how to document them? must research
+  - factor of safety
+  - testing procedures
+
+* upload code + document
+  - review standards for code documentation
+
+* licensing information
+  - which ones to use? read the FSF's website on licenses.
