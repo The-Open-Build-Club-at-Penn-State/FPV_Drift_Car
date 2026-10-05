@@ -1,12 +1,24 @@
 TODO:
 
-* Specifications
-  - how to document them? must research
-  - factor of safety
-  - testing procedures
+PHASE 1: DOCUMENT FOR MANUFACTURE
 
 * upload code + document
   - review standards for code documentation
 
+* draw electronics diagrams
+
+* give part numbers to store-bought parts
+
+* safety information
+  - this project uses a LiPo battery, which has major safety implications.
+  - there should be a battery safety document, and every other document should have a notice on it to read that document before proceeding
+
 * licensing information
   - which ones to use? read the FSF's website on licenses.
+
+PHASE 2: DOCUMENT FOR CONTRIBUTION
+
+* Specifications
+  - how to document them? must research
+  - factor of safety
+  - testing procedures
