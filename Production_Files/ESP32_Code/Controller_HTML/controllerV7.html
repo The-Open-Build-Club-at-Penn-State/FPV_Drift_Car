@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>F1 CAR // TELEMETRY CONTROL</title>
+<style>
+  :root{
+    --bg:#0b0d10;
+    --panel:#14171c;
+    --panel-line:#262b33;
+    --text:#e8e6e1;
+    --dim:#7a8290;
+    --red:#e10600;
+    --amber:#ffb100;
+    --green:#28c76f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{
+    height:100%; margin:0; background:var(--bg); color:var(--text);
+    font-family:'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+    overflow:hidden; touch-action:none;
+  }
+  .num{ font-family:'Consolas','SF Mono','Courier New',monospace; font-variant-numeric:tabular-nums; }
+
+  /* 100vh on mobile includes space the browser's address/toolbar can occupy,
+     which pushed the bottom of the layout off-screen. 100svh sizes to the
+     smallest possible visible viewport (toolbar showing), so nothing at the
+     bottom ever gets clipped, no matter the toolbar state or page zoom. */
+  #app{ height:100vh; height:100svh; display:flex; flex-direction:column; }
+
+  /* --- top status bar --- */
+  #statusbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:8px 14px; border-bottom:1px solid var(--panel-line);
+    font-size:12px; letter-spacing:1.5px; color:var(--dim); text-transform:uppercase;
+    gap:10px; flex-shrink:0;
+  }
+  #statusbar .brand{ color:var(--red); font-weight:700; }
+  #statusbar .side{ flex:1; display:flex; align-items:center; }
+  #statusbar .side.right{ justify-content:flex-end; }
+  #statusbar .side.center{ justify-content:center; }
+  #dot{ width:8px; height:8px; border-radius:50%; background:var(--red); display:inline-block; margin-right:6px; }
+  #dot.live{ background:var(--green); }
+
+  #revBtn{
+    background:var(--panel); border:1px solid var(--panel-line); color:var(--dim);
+    padding:6px 20px; border-radius:5px; font-size:12px; font-weight:700;
+    letter-spacing:2px; text-transform:uppercase;
+  }
+  #revBtn.active{ background:var(--amber); border-color:var(--amber); color:#1a1400; }
+
+  #acBtn{
+    background:var(--panel); border:1px solid var(--panel-line); color:var(--dim);
+    padding:6px 20px; border-radius:5px; font-size:12px; font-weight:700;
+    letter-spacing:2px; text-transform:uppercase; margin-left:10px;
+  }
+  #acBtn.active{ background:var(--green); border-color:var(--green); color:#04240f; }
+
+  /* --- main race area --- */
+  #main{ flex:1; display:flex; align-items:stretch; justify-content:space-between; padding:10px 14px 14px; gap:12px; min-height:0; }
+
+  /* --- steering column (left) --- */
+  #steerCol{ flex:1; min-width:150px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  #steerLabel{ font-size:11px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; margin-bottom:6px; }
+  #steerReadout{ font-size:20px; color:var(--text); margin-bottom:10px; }
+  #steerTrack{
+    position:relative; width:100%; height:56px; background:var(--panel);
+    border:1px solid var(--panel-line); border-radius:10px; overflow:hidden;
+    touch-action:none;
+  }
+  #steerCenterTick{
+    position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--panel-line);
+  }
+  #steerFill{
+    position:absolute; top:0; bottom:0; left:50%; width:0%;
+    background:linear-gradient(90deg, var(--amber), #7a5400);
+  }
+  #steerThumb{
+    position:absolute; top:3px; bottom:3px; left:50%; width:14px;
+    background:var(--text); border-radius:3px; transform:translateX(-50%);
+  }
+  #steerScale{
+    display:flex; justify-content:space-between; width:100%; margin-top:6px;
+    font-size:10px; letter-spacing:1px; color:var(--dim);
+  }
+
+  /* --- center column: video feed + graph --- */
+  #centerCol{ flex:2.2; display:flex; flex-direction:column; gap:10px; min-width:0; min-height:0; }
+  .landbox{
+    flex:1; position:relative; background:#000; border:1px solid var(--panel-line);
+    border-radius:8px; overflow:hidden; min-height:0;
+  }
+  .landbox .tag{
+    position:absolute; top:8px; left:10px; font-size:10px; letter-spacing:2px;
+    color:var(--dim); text-transform:uppercase; z-index:2;
+  }
+  #videoBox{ display:flex; align-items:center; justify-content:center; }
+  #videoBox .tag{ color:#3a3f47; z-index:2; pointer-events:none; transition:color .2s; }
+  #videoBox .tag.live{ color:var(--green); }
+  #camStream{
+    position:absolute; inset:0; width:100%; height:100%;
+    object-fit:contain; background:#000; z-index:1;
+  }
+  #graphBox{ background:var(--panel); }
+  #graphCanvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #graphLegend{
+    position:absolute; top:8px; right:10px; display:flex; gap:14px; z-index:2;
+    font-size:10px; letter-spacing:1px; color:var(--dim); text-transform:uppercase;
+  }
+  #graphLegend span{ display:inline-flex; align-items:center; gap:5px; }
+  #graphLegend i{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+  #graphLegend .thr i{ background:var(--red); }
+  #graphLegend .str i{ background:var(--amber); }
+
+  /* --- throttle column (right) --- */
+  #throttleCol{ display:flex; flex-direction:column; align-items:center; width:82px; flex-shrink:0; min-height:0; }
+  #throttleLabel{ font-size:11px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; margin-bottom:6px; flex-shrink:0; }
+  #throttleReadout{ font-size:20px; margin-bottom:10px; flex-shrink:0; }
+  #sliderTrack{
+    position:relative; flex:1; min-height:0; width:56px; background:var(--panel);
+    border:1px solid var(--panel-line); border-radius:10px; overflow:hidden;
+    touch-action:none;
+  }
+  #sliderFill{
+    position:absolute; left:0; right:0; bottom:0; height:0%;
+    background:linear-gradient(180deg, var(--red), #8a0400);
+  }
+  #sliderFill.rev{ background:linear-gradient(180deg, var(--amber), #7a5400); }
+  #sliderThumb{
+    position:absolute; left:3px; right:3px; height:14px; bottom:0%;
+    background:var(--text); border-radius:3px; transform:translateY(50%);
+  }
+
+  /* --- enable-controls overlay --- */
+  #overlay{
+    position:fixed; inset:0; background:rgba(11,13,16,0.97); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:24px; z-index:10;
+  }
+  #overlay h1{ font-size:20px; letter-spacing:2px; color:var(--red); margin:0 0 6px; text-transform:uppercase; }
+  #overlay p{ color:var(--dim); font-size:13px; max-width:280px; line-height:1.5; margin:0 0 20px; }
+  #startBtn{
+    background:var(--red); color:#fff; border:none; padding:14px 32px; border-radius:6px;
+    font-size:15px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  }
+
+  @media (orientation:portrait){
+    #rotateHint{ display:flex; }
+  }
+  #rotateHint{
+    display:none; position:fixed; inset:0; background:var(--bg); z-index:20;
+    align-items:center; justify-content:center; text-align:center; padding:30px;
+    color:var(--dim); font-size:14px; letter-spacing:1px; line-height:1.6;
+  }
+</style>
+</head>
+<body>
+
+<div id="rotateHint">ROTATE YOUR PHONE TO LANDSCAPE<br>FOR THE FULL CONTROL LAYOUT</div>
+
+<div id="overlay">
+  <h1>F1 Car // Enable Controls</h1>
+  <p>Make sure you're connected to the F1_CAR WiFi network first. Steer with the slider on the left, throttle with the slider on the right — tap start to connect.</p>
+  <button id="startBtn">Start</button>
+</div>
+
+<div id="app">
+  <div id="statusbar">
+    <div class="side left"><span class="brand">F1_CAR</span>&nbsp;TELEMETRY LINK</div>
+    <div class="side center"><button id="revBtn">Forward</button><button id="acBtn">Auto-Center: Off</button></div>
+    <div class="side right"><span id="dot"></span><span id="connText">CONNECTING</span></div>
+  </div>
+
+  <div id="main">
+    <div id="steerCol">
+      <div id="steerLabel">Steering</div>
+      <div id="steerReadout" class="num">0%</div>
+      <div id="steerTrack">
+        <div id="steerCenterTick"></div>
+        <div id="steerFill"></div>
+        <div id="steerThumb"></div>
+      </div>
+      <div id="steerScale"><span>-100</span><span>0</span><span>100</span></div>
+    </div>
+
+    <div id="centerCol">
+      <div id="videoBox" class="landbox">
+        <span class="tag" id="camTag">CAM // OFFLINE</span>
+        <img id="camStream" alt="">
+      </div>
+      <div id="graphBox" class="landbox">
+        <span class="tag">TELEMETRY GRAPH</span>
+        <div id="graphLegend">
+          <span class="thr"><i></i>Throttle</span>
+          <span class="str"><i></i>Steering</span>
+        </div>
+        <canvas id="graphCanvas"></canvas>
+      </div>
+    </div>
+
+    <div id="throttleCol">
+      <div id="throttleLabel">Throttle</div>
+      <div id="throttleReadout" class="num">0%</div>
+      <div id="sliderTrack">
+        <div id="sliderFill"></div>
+        <div id="sliderThumb"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------------- config ----------------
+  var ESP_IP = '192.168.4.1'; // fixed default gateway IP of an ESP32 access point
+  var SEND_HZ = 20;
+  var HIST_LEN = 150; // ~7.5s of history at SEND_HZ
+  var AUTOCENTER_MS = 180; // duration of the snap-back-to-center animation
+  var FRAME_TIMEOUT_MS = 1000; // no video frame in this long over the WS -> show "NO SIGNAL"
+
+  // ---------------- state ----------------
+  var steerPercent = 0;      // -100..100
+  var throttlePercent = 0;   // 0..100 (magnitude only, from slider)
+  var throttleSigned = 0;    // -100..100 (signed, for sending + graphing)
+  var isReverse = false;
+  var autoCenterEnabled = false; // OFF by default = original behavior (sliders hold position on release)
+
+  var ws = null;
+  var wsReady = false;
+  var currentBlobUrl = null;
+  var lastFrameTime = 0;
+
+  var steerHist = new Array(HIST_LEN).fill(0);
+  var throttleHist = new Array(HIST_LEN).fill(0);
+
+  // ---------------- DOM ----------------
+  var overlay = document.getElementById('overlay');
+  var startBtn = document.getElementById('startBtn');
+  var revBtn = document.getElementById('revBtn');
+  var acBtn = document.getElementById('acBtn');
+  var dot = document.getElementById('dot');
+  var connText = document.getElementById('connText');
+
+  var camStream = document.getElementById('camStream');
+  var camTag = document.getElementById('camTag');
+
+  var steerReadout = document.getElementById('steerReadout');
+  var steerTrack = document.getElementById('steerTrack');
+  var steerFill = document.getElementById('steerFill');
+  var steerThumb = document.getElementById('steerThumb');
+
+  var throttleReadout = document.getElementById('throttleReadout');
+  var sliderTrack = document.getElementById('sliderTrack');
+  var sliderFill = document.getElementById('sliderFill');
+  var sliderThumb = document.getElementById('sliderThumb');
+
+  var graphCanvas = document.getElementById('graphCanvas');
+  var gctx = graphCanvas.getContext('2d');
+
+  // ---------------- websocket (control + video, same connection) ----------------
+  // Video now rides this same socket as binary messages, instead of a
+  // separate HTTP request to port 81. Two rounds of trying to get a plain
+  // fetch()/Image() request to a private IP (192.168.4.1) past the
+  // browser's Private Network Access checks didn't stick on this build of
+  // Samsung Internet, even with the server sending the right preflight
+  // headers back. A script can't be blocked from receiving more data on a
+  // connection it already made — so instead of fighting that check, video
+  // frames just get pushed down the WebSocket that's already open and
+  // already proven to work for your control commands.
+  function connectWS(){
+    ws = new WebSocket('ws://' + ESP_IP + '/ws');
+    ws.binaryType = 'blob'; // camera frames arrive as binary WS messages, decoded straight to a Blob
+    ws.onopen = function(){ wsReady = true; dot.className='live'; connText.textContent='LIVE'; };
+    ws.onclose = function(){
+      wsReady = false; dot.className=''; connText.textContent='RECONNECTING';
+      camTag.textContent = 'CAM // OFFLINE'; camTag.className = 'tag';
+      setTimeout(connectWS, 1000);
+    };
+    ws.onerror = function(){ try{ ws.close(); }catch(e){} };
+    ws.onmessage = function(event){
+      // Binary = a JPEG video frame. (Text messages, if the firmware ever
+      // sends any, would land here too — as a string instead of a Blob —
+      // and can be handled separately without touching this branch.)
+      if (event.data instanceof Blob) {
+        var oldUrl = currentBlobUrl;
+        currentBlobUrl = URL.createObjectURL(event.data);
+        camStream.src = currentBlobUrl;
+        if (oldUrl) URL.revokeObjectURL(oldUrl); // free the previous frame's memory
+        camTag.textContent = 'CAM // LIVE';
+        camTag.className = 'tag live';
+        lastFrameTime = Date.now();
+      }
+    };
+  }
+  connectWS();
+
+  // Watchdog: WS can be connected (controls working) while the camera
+  // itself is stalled or failed to init — this catches that case, since
+  // ws.onclose alone wouldn't fire for it.
+  setInterval(function(){
+    if (wsReady && Date.now() - lastFrameTime > FRAME_TIMEOUT_MS) {
+      camTag.textContent = 'CAM // NO SIGNAL';
+      camTag.className = 'tag';
+    }
+  }, 300);
+
+  function sendState(){
+    if (!wsReady) return;
+    var s = Math.round(steerPercent);
+    var t = Math.round(throttleSigned);
+    try{ ws.send(JSON.stringify({s:s, t:t})); }catch(e){}
+  }
+
+  // ---------------- steering slider (horizontal, touch) ----------------
+  function setSteerFromClientX(clientX){
+    var rect = steerTrack.getBoundingClientRect();
+    var frac = (clientX - rect.left) / rect.width; // 0 at left, 1 at right
+    frac = Math.max(0, Math.min(1, frac));
+    steerPercent = Math.round(frac * 200 - 100); // -100..100
+    renderSteer();
+  }
+  function renderSteer(){
+    var posPct = (steerPercent + 100) / 2; // 0..100, position along track
+    steerThumb.style.left = posPct + '%';
+    if (steerPercent >= 0){
+      steerFill.style.left = '50%';
+      steerFill.style.width = (posPct - 50) + '%';
+    } else {
+      steerFill.style.left = posPct + '%';
+      steerFill.style.width = (50 - posPct) + '%';
+    }
+    steerReadout.textContent = steerPercent + '%';
+  }
+  renderSteer();
+
+  // Pointer Events give each finger its own pointerId, and setPointerCapture
+  // locks a pointer to the element it started on. That's what earlier broke:
+  // touch handlers were reading e.touches[0], which is just "the first finger
+  // that touched the screen" globally, so touching the steering slider while
+  // already holding the throttle slider fed the throttle slider's own
+  // coordinates into whichever control's touchstart fired second. Pointer
+  // capture makes each slider deaf to every pointer except its own.
+  function bindDrag(el, onPos, onRelease){
+    var activeId = null;
+    el.addEventListener('pointerdown', function(e){
+      if (activeId !== null) return; // ignore a second finger on the same control
+      activeId = e.pointerId;
+      el.setPointerCapture(e.pointerId);
+      onPos(e);
+      e.preventDefault();
+    });
+    el.addEventListener('pointermove', function(e){
+      if (e.pointerId !== activeId) return;
+      onPos(e);
+      e.preventDefault();
+    });
+    function release(e){
+      if (e.pointerId !== activeId) return;
+      activeId = null;
+      if (onRelease) onRelease();
+    }
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('lostpointercapture', release);
+  }
+
+  // ---------------- auto-center: snap back to 0 on release, if enabled ----------------
+  function animateSteerToCenter(){
+    var start = steerPercent, t0 = performance.now();
+    (function step(now){
+      var t = Math.min(1, (now - t0) / AUTOCENTER_MS);
+      steerPercent = Math.round(start * (1 - t));
+      renderSteer();
+      if (t < 1) requestAnimationFrame(step);
+      else { steerPercent = 0; renderSteer(); sendState(); }
+    })(t0);
+  }
+  function animateThrottleToZero(){
+    var start = throttlePercent, t0 = performance.now();
+    (function step(now){
+      var t = Math.min(1, (now - t0) / AUTOCENTER_MS);
+      throttlePercent = Math.round(start * (1 - t));
+      renderThrottle();
+      if (t < 1) requestAnimationFrame(step);
+      else { throttlePercent = 0; renderThrottle(); sendState(); }
+    })(t0);
+  }
+
+  bindDrag(steerTrack, function(e){ setSteerFromClientX(e.clientX); }, function(){
+    if (autoCenterEnabled) animateSteerToCenter();
+  });
+
+  // ---------------- throttle slider (vertical, touch) ----------------
+  function setThrottleFromClientY(clientY){
+    var rect = sliderTrack.getBoundingClientRect();
+    var frac = (rect.bottom - clientY) / rect.height; // 0 at bottom, 1 at top
+    frac = Math.max(0, Math.min(1, frac));
+    throttlePercent = Math.round(frac * 100);
+    renderThrottle();
+  }
+  function renderThrottle(){
+    sliderFill.style.height = throttlePercent + '%';
+    sliderFill.className = isReverse ? 'rev' : '';
+    sliderThumb.style.bottom = throttlePercent + '%';
+    var sign = isReverse ? '-' : '';
+    throttleReadout.textContent = sign + throttlePercent + '%';
+    throttleSigned = throttlePercent * (isReverse ? -1 : 1);
+  }
+  renderThrottle();
+
+  bindDrag(sliderTrack, function(e){ setThrottleFromClientY(e.clientY); }, function(){
+    if (autoCenterEnabled) animateThrottleToZero();
+  });
+
+  // ---------------- reverse toggle (top nav bar) ----------------
+  revBtn.addEventListener('click', function(){
+    isReverse = !isReverse;
+    revBtn.textContent = isReverse ? 'Reverse' : 'Forward';
+    revBtn.className = isReverse ? 'active' : '';
+    renderThrottle();
+  });
+
+  // ---------------- auto-center toggle (top nav bar) ----------------
+  // OFF = original behavior: sliders hold whatever position you release them at.
+  // ON  = both sliders snap back to 0 the moment you lift your finger.
+  acBtn.addEventListener('click', function(){
+    autoCenterEnabled = !autoCenterEnabled;
+    acBtn.textContent = 'Auto-Center: ' + (autoCenterEnabled ? 'On' : 'Off');
+    acBtn.className = autoCenterEnabled ? 'active' : '';
+  });
+
+  // ---------------- live telemetry graph ----------------
+  function fitCanvas(){
+    var dpr = window.devicePixelRatio || 1;
+    var rect = graphCanvas.getBoundingClientRect();
+    graphCanvas.width = Math.max(1, Math.round(rect.width * dpr));
+    graphCanvas.height = Math.max(1, Math.round(rect.height * dpr));
+    gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', fitCanvas);
+  window.addEventListener('orientationchange', function(){ setTimeout(fitCanvas, 300); });
+
+  function drawGraph(){
+    var w = graphCanvas.clientWidth, h = graphCanvas.clientHeight;
+    if (w === 0 || h === 0) return;
+    gctx.clearRect(0, 0, w, h);
+
+    function yFor(v){ return h/2 - (v/100) * (h/2 - 6); }
+
+    // zero line
+    gctx.strokeStyle = 'rgba(122,130,144,0.45)';
+    gctx.lineWidth = 1;
+    gctx.beginPath();
+    gctx.moveTo(0, yFor(0)); gctx.lineTo(w, yFor(0));
+    gctx.stroke();
+
+    // +-50 dashed guides
+    gctx.setLineDash([4, 4]);
+    gctx.strokeStyle = 'rgba(122,130,144,0.22)';
+    [50, -50].forEach(function(v){
+      gctx.beginPath();
+      gctx.moveTo(0, yFor(v)); gctx.lineTo(w, yFor(v));
+      gctx.stroke();
+    });
+    gctx.setLineDash([]);
+
+    function drawLine(hist, color){
+      gctx.strokeStyle = color;
+      gctx.lineWidth = 2;
+      gctx.beginPath();
+      for (var i = 0; i < hist.length; i++){
+        var x = (i / (HIST_LEN - 1)) * w;
+        var y = yFor(hist[i]);
+        if (i === 0) gctx.moveTo(x, y); else gctx.lineTo(x, y);
+      }
+      gctx.stroke();
+    }
+    drawLine(throttleHist, '#e10600');
+    drawLine(steerHist, '#ffb100');
+  }
+
+  function tick(){
+    sendState();
+
+    steerHist.push(steerPercent);
+    if (steerHist.length > HIST_LEN) steerHist.shift();
+    throttleHist.push(throttleSigned);
+    if (throttleHist.length > HIST_LEN) throttleHist.shift();
+
+    drawGraph();
+  }
+  setInterval(tick, Math.round(1000 / SEND_HZ));
+
+  // ---------------- start overlay ----------------
+  startBtn.addEventListener('click', function(){
+    overlay.style.display = 'none';
+    fitCanvas();
+    drawGraph();
+  });
+
+  fitCanvas();
+  drawGraph();
+
+  // ---------------- safety on page hide ----------------
+  window.addEventListener('beforeunload', function(){
+    if (wsReady){ try{ ws.send(JSON.stringify({s:0,t:0})); }catch(e){} }
+  });
+})();
+</script>
+</body>
+</html>
