@@ -1,0 +1,12 @@
+---RECOMMEDED SETTINGS---
+
+-Infill: 60 - 80%
+-Infill Type: Gyroid
+-Enable Supports
+-3 - 4 Walls on each part
+
+
+---Print Stats---
+
+-Print Time: 4h - 5h 30m (depending on printer)
+-88g filament with supports @ 70% infill
