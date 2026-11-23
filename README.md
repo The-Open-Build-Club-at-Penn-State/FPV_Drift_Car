@@ -4,10 +4,16 @@
   </a>
 </p>
 
-## Mini FPV Drift Car
-By Open Build Club, a recognized organization of the Pennsylvania State University
+# Mini FPV Drift Car
+By Open Build Club, a recognized organization of the Pennsylvania State University.
 
+This first-person view (FPV) drift car has many interesting and amusing features while maintaining a reasonable price tag. 
 
+Mechanically, the car is rear-wheel driven using a custom-made gearbox with straight-cut gears. The steering is controlled at the front using Reverse-Ackermann steering with an aggressive steering angle to enable drifting.
+
+Electronically, The on-board ESP32 CAM received input from a [TODO]
+
+This drift car design is intended as a beginner-friendly project to grow hands-on skills in 3d-printing, electronics, and microcontroller use. Reading documentation is also a skill that will be built throughout this project, as we have included in this repository all of the instructions necessary to manufacture, assemble, and program the car.
 
 # Contribution Guidelines
 
@@ -27,7 +33,11 @@ The Design Document contains information that explains and justifies the final d
 
 The Production Document contains all of the information necessary for the production of the part, including the Bill of Materials, Necessary Equipment, and a step-by-step guide on how to produce each part and assembly. Engineering drawings and supplementary images/videos will be provided where appropriate.
 
-# What does Open Source mean?
+# Organization Philosophy
+
+The following sections are not required reading to build this project, but instead explain our organization and its ideals, as well as those of the broader Open-Source movement.
+
+## What does Open Source mean?
 
 The Open Source Movement seeks to make information free ("free" as in free speech, not free beer). Traditionally, "information" has narrowly meant software, but in recent years this has expanded to also include hardware schematics.
 
@@ -41,11 +51,7 @@ It is important to bring up the Free Software Movement specifically as it is a v
 
 While this view is not necessarily outdated, it is certainly a noble goal to try and make it so. Whether they be called "Hackspaces" or "Makerspaces," there is a growing contingency of people who feel the need to be in control of their products—not the other way around. We don't believe that this movement is contrary to the goals of the Free Software Movement, but rather a complementary expansion of the movement. While the barrier for average people to manufacture their own eyeglasses or computer chips is clearly insurmountable for the foreseeable future, it is clear that giving the general population more alternatives and more control over their material products will increase their freedom.
 
-## Right to Repair
-
-NOT FINISHED
-
-# What is The Open Build Club?
+## What is The Open Build Club?
 
 Open Build Club is a recognized student organization of the Pennsylvania State University.
 
